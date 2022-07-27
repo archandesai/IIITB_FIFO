@@ -125,7 +125,7 @@ module Write_Interface(
     end 
 
 endmodule  
-module Fifo_Memory(
+module iiitb_fifo(
   clock,
   reset,
   write_Enable,
