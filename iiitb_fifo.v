@@ -1,6 +1,6 @@
-module fifo_mem(data_out,fifo_full, fifo_empty, fifo_threshold, fifo_overflow, fifo_underflow,clk, rst_n, wr, rd, data_in);  
+module iiitb_fifo(data_out,fifo_full, fifo_empty, fifo_threshold, fifo_overflow, fifo_underflow,clk, rst_n, wr, rd, data_in);  
   input wr, rd, clk, rst_n;  
-  input[7:0] data_in;   // FPGA projects using Verilog/ VHDL
+  input[7:0] data_in;   
   output[7:0] data_out;  
   output fifo_full, fifo_empty, fifo_threshold, fifo_overflow, fifo_underflow;  
   wire[4:0] wptr,rptr;  
