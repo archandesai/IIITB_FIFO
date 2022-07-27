@@ -1,4 +1,4 @@
-module Fifo_Memory_tb();
+module iiitb_fifo_tb();
 
     reg clock;
     reg reset;
@@ -11,7 +11,7 @@ module Fifo_Memory_tb();
     wire sig_Empty;
 
 
-    Fifo_Memory uut(
+    iiitb_fifo uut(
     .clock(clock),
     .reset(reset),
     .write_Enable(write_Enable),
