@@ -115,7 +115,7 @@ initial begin
         rst = 0;
         wr_en = 1;
         rd_en = 0;
-        data = 8'd1;
+        buf_in = 8'd1;
     end
 endmodule
 
