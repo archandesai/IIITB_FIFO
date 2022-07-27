@@ -23,8 +23,8 @@ module iiitb_fifo_tb();
     );
 
     initial begin
-        $dumpfile("Fifo_Memory_tb.vcd");
-        $dumpvars(0,Fifo_Memory_tb);
+        $dumpfile("iiitb_fifo_tb.vcd");
+        $dumpvars(0,iiit_fifo_tb);
 
         clock = 0;
         reset = 0;
