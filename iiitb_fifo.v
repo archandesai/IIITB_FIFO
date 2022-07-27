@@ -1,206 +1,96 @@
-module Compare_Logic(
-  clock,
-  reset,
-  write_Pointer,
-  read_Pointer,
-  write_Enable,
-  read_Enable,
-  sig_Full,
-  sig_Empty,
-  counter,
-  );
+`timescale 1ns / 1ps
 
-  parameter BUFFER_WIDTH = 3;
-  parameter BUFFER_SIZE = 8;
+`define BUF_WIDTH 3    // BUF_SIZE = 16 -> BUF_WIDTH = 4, no. of bits to be used in pointer
+`define BUF_SIZE ( 1<<`BUF_WIDTH )
 
-  input clock;
-  input reset;
-  input [BUFFER_WIDTH-1:0] write_Pointer;
-  inout [BUFFER_WIDTH-1:0] read_Pointer;
-  input write_Enable;
-  input read_Enable;
-  output reg sig_Full;
-  output reg sig_Empty;
-  output reg [BUFFER_WIDTH-1:0] counter;         
-  
-  always @(counter) begin
-    sig_Empty = (counter==0);
-    sig_Full = (counter== BUFFER_SIZE);
-  end
+module iiitb_fifo( clk, rst, buf_in, buf_out, wr_en, rd_en, buf_empty, buf_full, fifo_counter );
 
-  always @(posedge clock or negedge reset) begin
-    if( !reset )
-      counter <= 0;
-    else if(!sig_Full && write_Enable )
-      counter <= counter + 1;
-    else if(!sig_Empty && read_Enable )
-      counter <= counter - 1;
-    else
-      counter <= counter;
-  end
+input                 rst, clk, wr_en, rd_en;   
+// reset, system clock, write enable and read enable.
+input [7:0]           buf_in;                   
+// data input to be pushed to buffer
+output[7:0]           buf_out;                  
+// port to output the data using pop.
+output                buf_empty, buf_full;      
+// buffer empty and full indication 
+output[`BUF_WIDTH :0] fifo_counter;             
+// number of data pushed in to buffer   
 
-endmodule  
-module Memory_Array(
-  clock,
-  write_Enable,
-  write_Pointer,
-  sig_Full,
-  read_Pointer,
-  buffer_Input,
-  buffer_Output
-  );
+reg[7:0]              buf_out;
+reg                   buf_empty, buf_full;
+reg[`BUF_WIDTH :0]    fifo_counter;
+reg[`BUF_WIDTH -1:0]  rd_ptr, wr_ptr;           // pointer to read and write addresses  
+reg[7:0]              buf_mem[`BUF_SIZE -1 : 0]; //  
 
-  parameter BUFFER_WIDTH = 3;
-  parameter DATA_WIDTH = 8;
-  parameter BUFFER_SIZE = 8;
+always @(fifo_counter)
+begin
+   buf_empty = (fifo_counter==0);   // Checking for whether buffer is empty or not
+   buf_full = (fifo_counter== `BUF_SIZE);  //Checking for whether buffer is full or not
 
-  input clock;
-  input sig_Full;
-  input write_Enable;
-  input [BUFFER_WIDTH-1:0] write_Pointer;
-  input [BUFFER_WIDTH-1:0] read_Pointer;
-  input [DATA_WIDTH-1:0] buffer_Input;
-  output [DATA_WIDTH-1:0] buffer_Output;
-  reg  [DATA_WIDTH-1:0] buffer [BUFFER_SIZE-1: 0];
-  
-  reg [DATA_WIDTH-1:0] buffer_Output;
-  always @(posedge clock) begin
-    buffer_Output = buffer [read_Pointer];
-    if( write_Enable  & !sig_Full)
-      buffer[write_Pointer ] <= buffer_Input;
-  end
-  
-endmodule 
-module Read_Interface(
-  clock,
-  reset,
-  read_Enable,
-  sig_Empty,
-  read_Pointer
-  );
+end
 
-  parameter BUFFER_WIDTH = 3;
-  input clock;
-  input reset;
-  input read_Enable;
-  input sig_Empty;
-  output [BUFFER_WIDTH-1:0] read_Pointer;
-  
-  reg[BUFFER_WIDTH-1:0] read_Pointer; 
-  wire fifo_Read_Enable;
+//Setting FIFO counter value for different situations of read and write operations.
+always @(posedge clk or posedge rst)
+begin
+   if( rst )
+       fifo_counter <= 0;		// Reset the counter of FIFO
 
-  assign fifo_Read_Enable = (~sig_Empty)& read_Enable;  
-  always @(posedge clock or negedge reset) begin  
-    if(~reset)
-      read_Pointer <= 0;  
-    else if(fifo_Read_Enable)  
-      read_Pointer <= read_Pointer + 1;  
-  end 
+   else if( (!buf_full && wr_en) && ( !buf_empty && rd_en ) )  //When doing read and write operation simultaneously
+       fifo_counter <= fifo_counter;			// At this state, counter value will remain same.
 
-endmodule  
-module Write_Interface(
-    clock,
-    reset,
-    write_Enable,
-    sig_Full,
-    write_Pointer
-    );
+   else if( !buf_full && wr_en )			// When doing only write operation
+       fifo_counter <= fifo_counter + 1;
 
-    parameter BUFFER_WIDTH = 3;
-    input clock;
-    input reset;
-    input write_Enable;
-    input sig_Full;
-    output [BUFFER_WIDTH-1:0] write_Pointer;
-    
-    reg [BUFFER_WIDTH-1:0] write_Pointer;  
-    wire fifo_Write_Enable;
+   else if( !buf_empty && rd_en )		//When doing only read operation
+       fifo_counter <= fifo_counter - 1;
 
-    assign fifo_Write_Enable = (~sig_Full) & write_Enable;  
-    always @(posedge clock or negedge reset) begin  
-        if(~reset)
-            write_Pointer <= 0;  
-        else if(fifo_Write_Enable)  
-            write_Pointer <= write_Pointer + 1;     
-    end 
+   else
+      fifo_counter <= fifo_counter;			// When doing nothing.
+end
 
-endmodule  
-module iiitb_fifo(
-  clock,
-  reset,
-  write_Enable,
-  read_Enable,
-  buffer_Input,
-  buffer_Output,
-  sig_Full,
-  sig_Empty
-  ); 
+always @( posedge clk or posedge rst)
+begin
+   if( rst )
+      buf_out <= 0;		//On reset output of buffer is all 0.
+   else
+   begin
+      if( rd_en && !buf_empty )
+         buf_out <= buf_mem[rd_ptr];	//Reading the 8 bit data from buffer location indicated by read pointer
 
-  parameter BUFFER_WIDTH = 3;
-  parameter DATA_WIDTH = 8;
-  parameter BUFFER_SIZE = 8;
+      else
+         buf_out <= buf_out;		
 
-  input clock;
-  input reset;
-  input write_Enable;
-  input read_Enable;
-  input [DATA_WIDTH-1:0] buffer_Input;
-  output [DATA_WIDTH-1:0] buffer_Output;
-  output sig_Full;
-  output sig_Empty;
-  
-  
-  wire sig_Full;
-  wire sig_Empty;
-  wire [BUFFER_WIDTH-1:0] read_Pointer;
-  wire [BUFFER_WIDTH-1:0] write_Pointer;
-  wire [DATA_WIDTH-1:0] buffer_Output;
-  wire [BUFFER_WIDTH-1:0] counter;         
+   end
+end
 
-  Write_Interface #(.BUFFER_WIDTH(3))write_interface(
-    .clock(clock),
-    .reset(reset),
-    .write_Enable(write_Enable),
-    .sig_Full(sig_Full),
-    .write_Pointer(write_Pointer)
-    );
+always @(posedge clk)
+begin
+   if( wr_en && !buf_full )
+      buf_mem[ wr_ptr ] <= buf_in;		//Writing 8 bit data input to buffer location indicated by write pointer
 
+   else
+      buf_mem[ wr_ptr ] <= buf_mem[ wr_ptr ];
+end
 
-  Memory_Array #(.BUFFER_WIDTH(3),
-                 .DATA_WIDTH(8),
-                 .BUFFER_SIZE(8))
-    memory_array(
-      .clock(clock),
-      .write_Enable(write_Enable),
-      .write_Pointer(write_Pointer),
-      .sig_Full(sig_Full),
-      .read_Pointer(read_Pointer),
-      .buffer_Input(buffer_Input),
-      .buffer_Output(buffer_Output)
-    );
+always@(posedge clk or posedge rst)
+begin
+   if( rst )
+   begin
+      wr_ptr <= 0;		// Initializing write pointer
+      rd_ptr <= 0;		//Initializing read pointer
+   end
+   else
+   begin
+      if( !buf_full && wr_en )    
+			wr_ptr <= wr_ptr + 1;		// On write operation, Write pointer points to next location
+      else  
+			wr_ptr <= wr_ptr;
 
+      if( !buf_empty && rd_en )   
+			rd_ptr <= rd_ptr + 1;		// On read operation, read pointer points to next location to be read
+      else 
+			rd_ptr <= rd_ptr;
+   end
 
-  Read_Interface #(.BUFFER_WIDTH(3))read_interface(
-    .clock(clock),
-    .reset(reset),
-    .read_Enable(read_Enable),
-    .sig_Empty(sig_Empty),
-    .read_Pointer(read_Pointer)
-    ); 
-
-
-  Compare_Logic #(.BUFFER_WIDTH(3),
-                 .BUFFER_SIZE(8))
-    compare_logic(
-      .clock(clock),
-      .reset(reset),
-      .write_Pointer(write_Pointer),
-      .read_Pointer(read_Pointer),
-      .write_Enable(write_Enable),
-      .read_Enable(read_Enable),
-      .sig_Full(sig_Full),
-      .sig_Empty(sig_Empty),
-      .counter(counter)
-    );
-
-endmodule  
+end
+endmodule
