@@ -1,111 +1,206 @@
-`timescale 1ns / 1ps
+module Compare_Logic(
+  clock,
+  reset,
+  write_Pointer,
+  read_Pointer,
+  write_Enable,
+  read_Enable,
+  sig_Full,
+  sig_Empty,
+  counter,
+  );
 
+  parameter BUFFER_WIDTH = 3;
+  parameter BUFFER_SIZE = 8;
 
-`define BUF_WIDTH 3
-
-module iiitb_fifo_tb();
-reg clk, rst, wr_en, rd_en ;
-reg[7:0] buf_in;
-reg[7:0] tempdata;
-wire [7:0] buf_out;
-wire [`BUF_WIDTH :0] fifo_counter;
-
-iiitb_fifo ff( .clk(clk), .rst(rst), .buf_in(buf_in), .buf_out(buf_out), 
-         .wr_en(wr_en), .rd_en(rd_en), .buf_empty(buf_empty), 
-         .buf_full(buf_full), .fifo_counter(fifo_counter) );
-
-initial
-begin
-   clk = 0;
-   rst = 1;
-        rd_en = 0;
-        wr_en = 0;
-        tempdata = 0;
-        buf_in = 0;
-
-
-        #15 rst = 0;
+  input clock;
+  input reset;
+  input [BUFFER_WIDTH-1:0] write_Pointer;
+  inout [BUFFER_WIDTH-1:0] read_Pointer;
+  input write_Enable;
+  input read_Enable;
+  output reg sig_Full;
+  output reg sig_Empty;
+  output reg [BUFFER_WIDTH-1:0] counter;         
   
-        push(1);
-        fork
-           push(2);
-           pop(tempdata);
-        join              //push and pop together   
-        push(10);
-        push(20);
-        push(30);
-        push(40);
-        push(50);
-        push(60);
-        push(70);
-        push(80);
-        push(90);
-        push(100);
-        push(110);
-        push(120);
-        push(130);
+  always @(counter) begin
+    sig_Empty = (counter==0);
+    sig_Full = (counter== BUFFER_SIZE);
+  end
 
-        pop(tempdata);
-        push(tempdata);
-        pop(tempdata);
-        pop(tempdata);
-        pop(tempdata);
-        pop(tempdata);
-		  push(140);
-        pop(tempdata);
-        push(tempdata);//
-        pop(tempdata);
-        pop(tempdata);
-        pop(tempdata);
-        pop(tempdata);
-        pop(tempdata);
-        pop(tempdata);
-        pop(tempdata);
-        pop(tempdata);
-        pop(tempdata);
-        pop(tempdata);
-        pop(tempdata);
-        push(5);
-        pop(tempdata);
-end
+  always @(posedge clock or negedge reset) begin
+    if( !reset )
+      counter <= 0;
+    else if(!sig_Full && write_Enable )
+      counter <= counter + 1;
+    else if(!sig_Empty && read_Enable )
+      counter <= counter - 1;
+    else
+      counter <= counter;
+  end
 
-always
-   #5 clk = ~clk;
+endmodule  
+module Memory_Array(
+  clock,
+  write_Enable,
+  write_Pointer,
+  sig_Full,
+  read_Pointer,
+  buffer_Input,
+  buffer_Output
+  );
 
-task push;
-input[7:0] data;
+  parameter BUFFER_WIDTH = 3;
+  parameter DATA_WIDTH = 8;
+  parameter BUFFER_SIZE = 8;
+
+  input clock;
+  input sig_Full;
+  input write_Enable;
+  input [BUFFER_WIDTH-1:0] write_Pointer;
+  input [BUFFER_WIDTH-1:0] read_Pointer;
+  input [DATA_WIDTH-1:0] buffer_Input;
+  output [DATA_WIDTH-1:0] buffer_Output;
+  reg  [DATA_WIDTH-1:0] buffer [BUFFER_SIZE-1: 0];
+  
+  reg [DATA_WIDTH-1:0] buffer_Output;
+  always @(posedge clock) begin
+    buffer_Output = buffer [read_Pointer];
+    if( write_Enable  & !sig_Full)
+      buffer[write_Pointer ] <= buffer_Input;
+  end
+  
+endmodule 
+module Read_Interface(
+  clock,
+  reset,
+  read_Enable,
+  sig_Empty,
+  read_Pointer
+  );
+
+  parameter BUFFER_WIDTH = 3;
+  input clock;
+  input reset;
+  input read_Enable;
+  input sig_Empty;
+  output [BUFFER_WIDTH-1:0] read_Pointer;
+  
+  reg[BUFFER_WIDTH-1:0] read_Pointer; 
+  wire fifo_Read_Enable;
+
+  assign fifo_Read_Enable = (~sig_Empty)& read_Enable;  
+  always @(posedge clock or negedge reset) begin  
+    if(~reset)
+      read_Pointer <= 0;  
+    else if(fifo_Read_Enable)  
+      read_Pointer <= read_Pointer + 1;  
+  end 
+
+endmodule  
+module Write_Interface(
+    clock,
+    reset,
+    write_Enable,
+    sig_Full,
+    write_Pointer
+    );
+
+    parameter BUFFER_WIDTH = 3;
+    input clock;
+    input reset;
+    input write_Enable;
+    input sig_Full;
+    output [BUFFER_WIDTH-1:0] write_Pointer;
+    
+    reg [BUFFER_WIDTH-1:0] write_Pointer;  
+    wire fifo_Write_Enable;
+
+    assign fifo_Write_Enable = (~sig_Full) & write_Enable;  
+    always @(posedge clock or negedge reset) begin  
+        if(~reset)
+            write_Pointer <= 0;  
+        else if(fifo_Write_Enable)  
+            write_Pointer <= write_Pointer + 1;     
+    end 
+
+endmodule  
+module Fifo_Memory(
+  clock,
+  reset,
+  write_Enable,
+  read_Enable,
+  buffer_Input,
+  buffer_Output,
+  sig_Full,
+  sig_Empty
+  ); 
+
+  parameter BUFFER_WIDTH = 3;
+  parameter DATA_WIDTH = 8;
+  parameter BUFFER_SIZE = 8;
+
+  input clock;
+  input reset;
+  input write_Enable;
+  input read_Enable;
+  input [DATA_WIDTH-1:0] buffer_Input;
+  output [DATA_WIDTH-1:0] buffer_Output;
+  output sig_Full;
+  output sig_Empty;
+  
+  
+  wire sig_Full;
+  wire sig_Empty;
+  wire [BUFFER_WIDTH-1:0] read_Pointer;
+  wire [BUFFER_WIDTH-1:0] write_Pointer;
+  wire [DATA_WIDTH-1:0] buffer_Output;
+  wire [BUFFER_WIDTH-1:0] counter;         
+
+  Write_Interface #(.BUFFER_WIDTH(3))write_interface(
+    .clock(clock),
+    .reset(reset),
+    .write_Enable(write_Enable),
+    .sig_Full(sig_Full),
+    .write_Pointer(write_Pointer)
+    );
 
 
-   if( buf_full )
-            $display("---Cannot push: Buffer Full---");
-        else
-        begin
-           $display("Pushed ",data );
-           buf_in = data;
-           wr_en = 1;
-                @(posedge clk);
-                #1 wr_en = 0;
-        end
+  Memory_Array #(.BUFFER_WIDTH(3),
+                 .DATA_WIDTH(8),
+                 .BUFFER_SIZE(8))
+    memory_array(
+      .clock(clock),
+      .write_Enable(write_Enable),
+      .write_Pointer(write_Pointer),
+      .sig_Full(sig_Full),
+      .read_Pointer(read_Pointer),
+      .buffer_Input(buffer_Input),
+      .buffer_Output(buffer_Output)
+    );
 
-endtask
 
-task pop;
-output [7:0] data;
+  Read_Interface #(.BUFFER_WIDTH(3))read_interface(
+    .clock(clock),
+    .reset(reset),
+    .read_Enable(read_Enable),
+    .sig_Empty(sig_Empty),
+    .read_Pointer(read_Pointer)
+    ); 
 
-   if( buf_empty )
-            $display("---Cannot Pop: Buffer Empty---");
-   else
-        begin
 
-     rd_en = 1;
-          @(posedge clk);
+  Compare_Logic #(.BUFFER_WIDTH(3),
+                 .BUFFER_SIZE(8))
+    compare_logic(
+      .clock(clock),
+      .reset(reset),
+      .write_Pointer(write_Pointer),
+      .read_Pointer(read_Pointer),
+      .write_Enable(write_Enable),
+      .read_Enable(read_Enable),
+      .sig_Full(sig_Full),
+      .sig_Empty(sig_Empty),
+      .counter(counter)
+    );
 
-          #1 rd_en = 0;
-          data = buf_out;
-           $display("-------------------------------Poped ", data);
-
-        end
-endtask
-
-endmodule
-
+endmodule  
